@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>하루 공부 스케줄</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #F7F5F0;
+  --surface: #FFFFFF;
+  --border: #E4E0D8;
+  --text-primary: #1A1916;
+  --text-secondary: #6B6760;
+  --text-muted: #A8A49E;
+}
+
+body {
+  font-family: 'Noto Sans KR', sans-serif;
+  background: var(--bg);
+  color: var(--text-primary);
+  min-height: 100vh;
+  padding: 32px 16px 64px;
+}
+
+.container { max-width: 680px; margin: 0 auto; }
+
+/* 헤더 */
+.header-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px; letter-spacing: 0.12em;
+  color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px;
+}
+h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 24px; }
+h1 span { color: var(--text-muted); font-weight: 300; }
+
+/* 상단 스탯 카드 */
+.stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 20px; }
+.stat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+.stat-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-family: 'DM Mono', monospace; }
+.stat-value { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+.stat-sub { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+
+/* 편집 토글 */
+.toolbar { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-bottom: 12px; }
+.toolbar-label { font-size: 12px; color: var(--text-secondary); }
+.toggle {
+  position: relative; width: 36px; height: 20px;
+  background: var(--border); border-radius: 10px;
+  cursor: pointer; transition: background 0.2s; flex-shrink: 0;
+}
+.toggle.on { background: #1A1916; }
+.toggle-knob {
+  position: absolute; top: 2px; left: 2px;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: #fff; transition: transform 0.2s; pointer-events: none;
+}
+.toggle.on .toggle-knob { transform: translateX(16px); }
+
+/* 탭 */
+.tabs {
+  display: flex; gap: 6px; margin-bottom: 20px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 5px;
+}
+.tab {
+  flex: 1; padding: 9px 8px; border-radius: 8px;
+  font-size: 12px; font-weight: 500;
+  font-family: 'Noto Sans KR', sans-serif;
+  cursor: pointer; border: none; background: transparent;
+  color: var(--text-secondary); transition: all 0.15s; text-align: center;
+}
+.tab:hover { color: var(--text-primary); }
+.tab.active { background: #1A1916; color: #F7F5F0; }
+
+/* 패널 */
+.panel { display: none; }
+.panel.active { display: block; }
+
+/* 스케줄 테이블 */
+.schedule {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; overflow: hidden;
+}
+.srow {
+  display: flex; align-items: stretch;
+  border-bottom: 1px solid var(--border);
+}
+.srow:last-child { border-bottom: none; }
+
+.tcol {
+  width: 68px; flex-shrink: 0; padding: 10px 12px;
+  font-family: 'DM Mono', monospace; font-size: 11px;
+  color: var(--text-muted); display: flex; align-items: center;
+  border-right: 1px solid var(--border); background: var(--bg);
+}
+.bcol { flex: 1; padding: 5px 7px; display: flex; align-items: center; }
+.bar {
+  width: 100%; border-radius: 7px; padding: 8px 12px;
+  font-size: 13px; font-weight: 500; line-height: 1.4;
+  border: 1px solid transparent;
+  display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;
+}
+.bar-main { flex: 1; min-width: 0; }
+.bar-dur { font-size: 11px; font-weight: 400; opacity: 0.7; font-family: 'DM Mono', monospace; white-space: nowrap; }
+
+/* 바 색상 */
+.c-study1  { background: #EEF0FF; color: #3730A3; border-color: #C7C9F5; }
+.c-study2  { background: #ECFDF5; color: #065F46; border-color: #86EFAC; }
+.c-study3  { background: #FFF7ED; color: #7C2D12; border-color: #FED7AA; }
+.c-swim    { background: #EFF6FF; color: #1E3A8A; border-color: #BFDBFE; }
+.c-work    { background: #FEF9C3; color: #713F12; border-color: #FDE68A; }
+.c-neutral { background: #F1EDE6; color: #6B6760; border-color: #DDD9D2; }
+
+/* 행 액션 버튼 (편집 모드에서만 표시) */
+.row-btns {
+  display: none; flex-direction: column;
+  justify-content: center; gap: 3px;
+  padding: 0 5px 0 0; flex-shrink: 0;
+}
+.rbtn {
+  width: 18px; height: 18px; border-radius: 4px;
+  border: 1px solid var(--border); background: var(--bg);
+  cursor: pointer; font-size: 13px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-muted); transition: all 0.15s;
+}
+.rbtn:hover { background: #1A1916; color: #fff; border-color: #1A1916; }
+
+/* 색상 선택 팔레트 */
+.cpick {
+  display: none; gap: 4px; padding: 4px 10px;
+  border-top: 1px solid var(--border); background: var(--bg);
+  flex-wrap: wrap; align-items: center;
+}
+.cpick-label { font-size: 10px; color: var(--text-muted); font-family: 'DM Mono', monospace; }
+.cdot {
+  width: 14px; height: 14px; border-radius: 3px;
+  cursor: pointer; border: 1.5px solid transparent; transition: transform 0.1s;
+}
+.cdot:hover { transform: scale(1.2); }
+.cdot.sel { border-color: #1A1916; }
+
+/* 행 추가 버튼 */
+.add-btn {
+  display: none; width: 100%; padding: 9px;
+  border: 1.5px dashed var(--border); border-radius: 10px;
+  background: transparent; cursor: pointer;
+  font-size: 12px; color: var(--text-muted);
+  font-family: 'Noto Sans KR', sans-serif;
+  margin-top: 6px; transition: all 0.15s;
+}
+.add-btn:hover { border-color: #1A1916; color: #1A1916; background: var(--surface); }
+
+/* contenteditable 스타일 */
+[contenteditable="true"] {
+  outline: none; border-radius: 3px;
+  padding: 1px 3px; cursor: text;
+  min-width: 16px; display: inline-block;
+  transition: background 0.12s;
+}
+[contenteditable="true"]:hover { background: rgba(0,0,0,0.06); }
+[contenteditable="true"]:focus { background: rgba(0,0,0,0.09); box-shadow: 0 0 0 1px rgba(0,0,0,0.18); }
+
+/* 편집 힌트 */
+.edit-hint {
+  display: none; font-size: 11px; color: var(--text-muted);
+  text-align: center; margin-top: 7px; font-family: 'DM Mono', monospace;
+}
+
+/* 하단 요약 */
+.sum-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+.sum-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 11px 13px; }
+.sum-lbl { font-size: 11px; color: var(--text-muted); margin-bottom: 2px; font-family: 'DM Mono', monospace; }
+.sum-val { font-size: 19px; font-weight: 700; letter-spacing: -0.02em; }
+.sum-sub { font-size: 11px; color: var(--text-secondary); margin-top: 1px; }
+
+.tip {
+  margin-top: 10px; background: var(--surface);
+  border: 1px solid var(--border); border-left: 3px solid #1A1916;
+  border-radius: 0 10px 10px 0; padding: 11px 14px;
+  font-size: 12px; color: var(--text-secondary); line-height: 1.8;
+}
+
+footer { margin-top: 36px; text-align: center; font-size: 11px; color: var(--text-muted); font-family: 'DM Mono', monospace; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header-label">AICPA 2026 — FAR Section</div>
+  <h1>하루 공부 스케줄 <span>/ Daily Plan</span></h1>
+
+  <div class="stats-row">
+    <div class="stat">
+      <div class="stat-label" id="lbl-day">하루 공부</div>
+      <div class="stat-value" id="val-day">—</div>
+      <div class="stat-sub">현재 탭 기준</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label" id="lbl-week">평일 합계</div>
+      <div class="stat-value" id="val-week">—</div>
+      <div class="stat-sub" id="sub-week">화목×2 + 월수×2</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">주간 합계</div>
+      <div class="stat-value" id="val-total">—</div>
+      <div class="stat-sub" id="sub-total">평일 + 자유일</div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <span class="toolbar-label">편집 모드</span>
+    <div class="toggle" id="toggle" onclick="toggleEdit()">
+      <div class="toggle-knob"></div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('mon_wed', this)">월·수 (운동)</button>
+    <button class="tab" onclick="showTab('tue_thu', this)">화·목 (수영)</button>
+    <button class="tab" onclick="showTab('fri_sat', this)">금·토 (자유)</button>
+  </div>
+
+  <!-- 화·목 -->
+  <div id="tue_thu" class="panel">
+    <div class="schedule" id="s-tue_thu">
+      <div class="srow" data-c="c-swim">
+        <div class="tcol"><span>06:30</span></div>
+        <div class="bcol"><div class="bar c-swim"><span class="bar-main">🏊 수영 + 씻기</span><span class="bar-dur">~ 08:20 · 1h 50m</span></div></div>
+        <div class="row-btns"><button class="rbtn" onclick="delRow(this)">×</button><button class="rbtn" onclick="addAfter(this)">+</button></div>
+      </div>
+      <div class="srow" data-c="c-neutral">
+        <div class="tcol"><span>08:20</span></div>
+        <div class="bcol"><div class="bar c-neutral"><span class="bar-main">아침 식사</span><span class="bar-dur">40m</span></div></div>
+        <div class="row-btns"><button class="rbtn" onclick="delRow(this)">×</button><button class="rbtn" onclick="addAfter(this)">+</button></div>
+      </div>
+      <div class="srow" data-c="c-study1">
+        <div class="tcol"><span>09:00</span></div>
+        <div class="bcol"><div class="bar c-study1"><span class="bar-main">📖 블록 1 — 강의 수강</span><span class="bar-dur">~ 12:00 · 3h</span></div></div>
+        <div class="row-btns"><button class="rbtn" onclick="delRow(this)">×</button><button class="rbtn" onclick="addAfter(this)">+</button></div>
+      </div>
+      <div class="srow" data-c="c-neutral">
+        <div class="tcol"><span>12:00</span></div>
+        <div class="bcol"><div class="bar c-neutral"><span class="bar-main">점심 + 휴식</span><span class="bar-dur">1h</span></div></div>
+        <div class="row-btns"><button class="rbtn" onclick="delRow(this)">×</button><button class="rbtn" onclick="addAfter(this)">+</button></div>
+      </div>
+      <div class="srow" data-c="c-study2">
+        <div class="tcol"><span>13:00</span></div>
+        <div class="bcol"><div class="bar c-study2"><span class="bar-main">📝 블록 2 — MCQ 문제풀이</span><span class="bar-dur">~ 14:30 · 1.5h</span></div></div>
+        <div class="row-btns"><button class="rbtn" onclick="delRow(this)">×</button><button class="rbtn" onclick="addAfter(this)">+</button></div>
+      </div>
+      <div class="srow" data-c="c-neutral">
+        <div class="tcol"><span>14:30</span></div>
+        <div class="bcol"><div class="bar c-neutral"><span class="bar-main">준비 + 이동</span><span class="bar-dur">10m</span></div></div>
+        <div class="row-btns"><button class="rbtn" onclick="delRow(this)">×</button><button class="rbtn" onclick="addAfter(this)">+</button></div>
+      </div>
+      <div class="srow" data-c="c-work">
+        <div class="tcol"><span>14:40</span></div>
+        <div class="bcol"><div class="bar c-work"><span class="bar-main">🏢 출근 · 근무 · 퇴근</span><span class="bar-dur">~ 18:30 · 통근 포함</span></div></div>
+        <div class="row-btns"><button class="rbtn" onclick="delRow(this)">×</button><button class="rbtn" onclick="addAfter(this)">+</button></div>
+      </div>
+      <div class="srow" data-c="c-neutral">
+        <div class="tcol"><span>18:30</span></div>
+        <div class="bcol"><div class="bar c-neutral"><span class="bar-main">저녁 식사</span><span class="bar-dur">30m</span></div></div>
+        <div class="row-btns"><button class="rbtn" onclick="delRow(this)">×</button><button class="rbtn" onclick="addAfter(this)">+</button></div>
+      </div>
+      <div class="srow" data-c="c-study3">
+        <div class="tcol"><span>19:00</span></div>
+        <div class="bcol"><div class="bar c-study3"><span class="bar-main">🗒️ 블록 3 — 오답 정리·복습</span><span class="bar-dur">~ 21:30 · 2.5h</span></div></div>
+        <div class="row-btns"><button class="rbtn" onclick="delRow(this)">×</button><button class="rbtn" onclick="addAfter(this)">+</button></div>
+      </div>
+      <div class="srow" data-c="c-neutral">
+        <div class="tcol"><span>21:30</span></div>
+        <div class="bcol"><div class="bar c-neutral"><span class="bar-main">자유 시간</span><span class="bar-dur">2.5h</span></div></div>
+        <div class="row-btns"><button class="rbtn" onclick="delRow(this)">×</button><button class="rbtn" onclick="addAfter(this)">+</button></div>
+      </div>
+      <div class="srow" data-c="c-neutral">
+        <div class="tcol"><span>24:00</span></div>
+        <div class="bcol"><div class="bar c-neutral"><span class="bar-main">취침</span><span class="bar-dur"></span></div></div>
+        <div class="row-btns"><button class="rbtn" onclick="delRow(this)">×</button><button class="rbtn" onclick="addAfter(this)">+</button></div>
+      </div>
+    </div>
+    <button class="add-btn" onclick="addToSched('s-tue_thu')">+ 행 추가</button>
+    <div class="edit-hint">편집 모드에서 시간·텍스트를 클릭해 수정하세요</div>
+    <div class="sum-row">
+      <div class="sum-card"><div class="sum-lbl">하루 공부</div><div class="sum-val" id="sv-tue_thu">—</div><div class="sum-sub">study 블록 합산</div></div>
+      <div class="sum-card"><div class="sum-lbl">운동</div><div class="sum-val">1h 50m</div><div class="sum-sub">수영 + 씻기</div></div>
+      <div class="sum-card"><div class="sum-lbl">자유 시간</div><div class="sum-val">2.5h</div><div class="sum-sub">21:30 이후</div></div>
+    </div>
+    <div class="tip">수영 후 뇌 활성화 타이밍에 바로 강의 → 집중력 최고점 활용<br>블록 2는 출근 전 짧게 MCQ → 당일 내용 즉시 점검</div>
+  </div>
+
+  <!-- 월·수 -->
+  <div id="mon_wed" class="panel active">
+    <div class="schedule" id="s-mon_wed">
+      <div class="srow" data-c="c-swim">
+        <div class="tcol"><span>07:00</span></div>
+        <div class="bcol"><div class="bar c-swim"><span class="bar-main">💪 아침 운동 + 씻기</span><span class="bar-dur">~ 08:30 · 확정 후 조정</span></div></div>
+        <div class="row-btns"><button class="rbtn" onclick="delRow(this)">×</button><button class="rbtn" onclick="addAfter(this)">+</button></div>
+      </div>
+      <div class="srow" data-c="c-neutral">
+        <div class="tcol"><span>08:30</span></div>
+        <div class="bcol"><div class="bar c-neutral"><span class="bar-main">아침 식사</span><span class="bar-dur">30m</span></div></div>
+        <div class="row-btns"><button class="rbtn" onclick="delRow(this)">×</button><button class="rbtn" onclick="addAfter(this)">+</button></div>
+      </div>
+      <div class="srow" data-c="c-study1">
+        <div class="tcol"><span>09:00</span></div>
+        <div class="bcol"><div class="bar c-study1"><span class="bar-main">📖 블록 1 — 강의 수강</span><span class="bar-dur">~ 12:00 · 3h</span></div></div>
+        <div class="row-btns"><button class="rbtn" onclick="delRow(this)">×</button><button class="rbtn" onclick="addAfter(this)">+</button></div>
+      </div>
+      <div class="srow" data-c="c-neutral">
+        <div class="tcol"><span>12:00</span></div>
+        <div class="bcol"><div class="bar c-neutral"><span class="bar-main">점심 + 휴식</span><span class="bar-dur">1h</span></div></div>
+        <div class="row-btns"><button class="rbtn" onclick="delRow(this)">×</button><button class="rbtn" onclick="addAfter(this)">+</button></div>
+      </div>
+      <div class="srow" data-c="c-study2">
+        <div class="tcol"><span>13:00</span></div>
+        <div class="bcol"><div class="bar c-study2"><span class="bar-main">📝 블록 2 — MCQ 문제풀이</span><span class="bar-dur">~ 14:30 · 1.5h</span></div></div>
+        <div class="row-btns"><button class="rbtn" onclick="delRow(this)">×</button><button class="rbtn" onclick="addAfter(this)">+</button></div>
+      </div>
+      <div class="srow" data-c="c-neutral">
+        <div class="tcol"><span>14:30</span></div>
+        <div class="bcol"><div class="bar c-neutral"><span class="bar-main">준비 + 이동</span><span class="bar-dur">10m</span></div></div>
+        <div class="row-btns"><button class="rbtn" onclick="delRow(this)">×</button><button class="rbtn" onclick="addAfter(this)">+</button></div>
+      </div>
+      <div class="srow" data-c="c-work">
+        <div class="tcol"><span>14:40</span></div>
+        <div class="bcol"><div class="bar c-work"><span class="bar-main">🏢 출근 · 근무 · 퇴근</span><span class="bar-dur">~ 18:30 · 통근 포함</span></div></div>
+        <div class="row-btns"><button class="rbtn" onclick="delRow(this)">×</button><button class="rbtn" onclick="addAfter(this)">+</button></div>
+      </div>
+      <div class="srow" data-c="c-neutral">
+        <div class="tcol"><span>18:30</span></div>
+        <div class="bcol"><div class="bar c-neutral"><span class="bar-main">저녁 식사</span><span class="bar-dur">30m</span></div></div>
+        <div class="row-btns"><button class="rbtn" onclick="delRow(this)">×</button><button class="rbtn" onclick="addAfter(this)">+</button></div>
+      </div>
+      <div class="srow" data-c="c-study3">
+        <div class="tcol"><span>19:00</span></div>
+        <div class="bcol"><div class="bar c-study3"><span class="bar-main">🗒️ 블록 3 — 오답 정리·복습</span><span class="bar-dur">~ 21:30 · 2.5h</span></div></div>
+        <div class="row-btns"><button class="rbtn" onclick="delRow(this)">×</button><button class="rbtn" onclick="addAfter(this)">+</button></div>
+      </div>
+      <div class="srow" data-c="c-neutral">
+        <div class="tcol"><span>21:30</span></div>
+        <div class="bcol"><div class="bar c-neutral"><span class="bar-main">자유 시간</span><span class="bar-dur">2.5h</span></div></div>
+        <div class="row-btns"><button class="rbtn" onclick="delRow(this)">×</button><button class="rbtn" onclick="addAfter(this)">+</button></div>
+      </div>
+      <div class="srow" data-c="c-neutral">
+        <div class="tcol"><span>24:00</span></div>
+        <div class="bcol"><div class="bar c-neutral"><span class="bar-main">취침</span><span class="bar-dur"></span></div></div>
+        <div class="row-btns"><button class="rbtn" onclick="delRow(this)">×</button><button class="rbtn" onclick="addAfter(this)">+</button></div>
+      </div>
+    </div>
+    <button class="add-btn" onclick="addToSched('s-mon_wed')">+ 행 추가</button>
+    <div class="edit-hint">편집 모드에서 시간·텍스트를 클릭해 수정하세요</div>
+    <div class="sum-row">
+      <div class="sum-card"><div class="sum-lbl">하루 공부</div><div class="sum-val" id="sv-mon_wed">—</div><div class="sum-sub">study 블록 합산</div></div>
+      <div class="sum-card"><div class="sum-lbl">운동</div><div class="sum-val">1.5h</div><div class="sum-sub">확정 후 수정</div></div>
+      <div class="sum-card"><div class="sum-lbl">자유 시간</div><div class="sum-val">2.5h</div><div class="sum-sub">21:30 이후</div></div>
+    </div>
+    <div class="tip">화·목과 동일한 블록 구조 — 운동 루틴만 다름<br>아침 운동 시간 확정되면 기상·블록 1 시작 시간 조정</div>
+  </div>
+
+  <!-- 금·토 -->
+  <div id="fri_sat" class="panel">
+    <div class="schedule" id="s-fri_sat">
+      <div class="srow" data-c="c-neutral">
+        <div class="tcol"><span>08:00</span></div>
+        <div class="bcol"><div class="bar c-neutral"><span class="bar-main">기상 + 아침</span><span class="bar-dur">1h</span></div></div>
+        <div class="row-btns"><button class="rbtn" onclick="delRow(this)">×</button><button class="rbtn" onclick="addAfter(this)">+</button></div>
+      </div>
+      <div class="srow" data-c="c-study1">
+        <div class="tcol"><span>09:00</span></div>
+        <div class="bcol"><div class="bar c-study1"><span class="bar-main">📖 블록 1 — 강의 수강</span><span class="bar-dur">~ 12:00 · 3h</span></div></div>
+        <div class="row-btns"><button class="rbtn" onclick="delRow(this)">×</button><button class="rbtn" onclick="addAfter(this)">+</button></div>
+      </div>
+      <div class="srow" data-c="c-neutral">
+        <div class="tcol"><span>12:00</span></div>
+        <div class="bcol"><div class="bar c-neutral"><span class="bar-main">점심 + 휴식</span><span class="bar-dur">1h</span></div></div>
+        <div class="row-btns"><button class="rbtn" onclick="delRow(this)">×</button><button class="rbtn" onclick="addAfter(this)">+</button></div>
+      </div>
+      <div class="srow" data-c="c-study2">
+        <div class="tcol"><span>13:00</span></div>
+        <div class="bcol"><div class="bar c-study2"><span class="bar-main">📝 블록 2 — MCQ 문제풀이</span><span class="bar-dur">~ 16:00 · 3h</span></div></div>
+        <div class="row-btns"><button class="rbtn" onclick="delRow(this)">×</button><button class="rbtn" onclick="addAfter(this)">+</button></div>
+      </div>
+      <div class="srow" data-c="c-neutral">
+        <div class="tcol"><span>16:00</span></div>
+        <div class="bcol"><div class="bar c-neutral"><span class="bar-main">휴식 · 간식</span><span class="bar-dur">1h</span></div></div>
+        <div class="row-btns"><button class="rbtn" onclick="delRow(this)">×</button><button class="rbtn" onclick="addAfter(this)">+</button></div>
+      </div>
+      <div class="srow" data-c="c-study3">
+        <div class="tcol"><span>17:00</span></div>
+        <div class="bcol"><div class="bar c-study3"><span class="bar-main">🗒️ 블록 3 — 오답 정리·복습</span><span class="bar-dur">~ 20:00 · 3h</span></div></div>
+        <div class="row-btns"><button class="rbtn" onclick="delRow(this)">×</button><button class="rbtn" onclick="addAfter(this)">+</button></div>
+      </div>
+      <div class="srow" data-c="c-neutral">
+        <div class="tcol"><span>20:00</span></div>
+        <div class="bcol"><div class="bar c-neutral"><span class="bar-main">저녁 + 자유 시간</span><span class="bar-dur">4h</span></div></div>
+        <div class="row-btns"><button class="rbtn" onclick="delRow(this)">×</button><button class="rbtn" onclick="addAfter(this)">+</button></div>
+      </div>
+      <div class="srow" data-c="c-neutral">
+        <div class="tcol"><span>24:00</span></div>
+        <div class="bcol"><div class="bar c-neutral"><span class="bar-main">취침</span><span class="bar-dur"></span></div></div>
+        <div class="row-btns"><button class="rbtn" onclick="delRow(this)">×</button><button class="rbtn" onclick="addAfter(this)">+</button></div>
+      </div>
+    </div>
+    <button class="add-btn" onclick="addToSched('s-fri_sat')">+ 행 추가</button>
+    <div class="edit-hint">편집 모드에서 시간·텍스트를 클릭해 수정하세요</div>
+    <div class="sum-row">
+      <div class="sum-card"><div class="sum-lbl">하루 공부</div><div class="sum-val" id="sv-fri_sat">—</div><div class="sum-sub">study 블록 합산</div></div>
+      <div class="sum-card"><div class="sum-lbl">자유 시간</div><div class="sum-val">4h</div><div class="sum-sub">20:00 이후</div></div>
+      <div class="sum-card"><div class="sum-lbl">자유일 합계</div><div class="sum-val" id="sv-fri_sat-total">—</div><div class="sum-sub">금·토 × 2</div></div>
+    </div>
+    <div class="tip">금요일 휴무 + 토요일 자유 — 블록 3개 풀가동<br>일요일 완전 휴식 → 다음 주 컨디션 회복</div>
+  </div>
+
+  <footer>AICPA FAR 2026 · 일요일 휴식 포함 주간 플랜</footer>
+</div>
+
+<script>
+// ── 색상 팔레트 ──
+const PALETTE = [
+  { cls: 'c-study1', hex: '#818CF8', lbl: '강의' },
+  { cls: 'c-study2', hex: '#34D399', lbl: '문풀' },
+  { cls: 'c-study3', hex: '#FB923C', lbl: '복습' },
+  { cls: 'c-swim',   hex: '#60A5FA', lbl: '운동' },
+  { cls: 'c-work',   hex: '#FCD34D', lbl: '근무' },
+  { cls: 'c-neutral',hex: '#C4BDB5', lbl: '기타' },
+];
+const STUDY_CLS = ['c-study1', 'c-study2', 'c-study3'];
+
+// ── 탭 전환 ──
+function showTab(id, btn) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+  recalc();
+}
+
+// ── 편집 모드 ──
+let editOn = false;
+
+function toggleEdit() {
+  editOn = !editOn;
+  const tog = document.getElementById('toggle');
+  tog.classList.toggle('on', editOn);
+
+  // contenteditable
+  document.querySelectorAll('.tcol span, .bar-main, .bar-dur').forEach(el => {
+    el.setAttribute('contenteditable', editOn ? 'true' : 'false');
+  });
+
+  // 행 버튼 & 색상 팔레트 & 추가 버튼 & 힌트
+  document.querySelectorAll('.row-btns').forEach(el => {
+    el.style.display = editOn ? 'flex' : 'none';
+  });
+  document.querySelectorAll('.add-btn').forEach(el => {
+    el.style.display = editOn ? 'block' : 'none';
+  });
+  document.querySelectorAll('.edit-hint').forEach(el => {
+    el.style.display = editOn ? 'block' : 'none';
+  });
+
+  if (editOn) {
+    document.querySelectorAll('.srow').forEach(row => {
+      if (!row.querySelector('.cpick')) attachPalette(row);
+    });
+  } else {
+    document.querySelectorAll('.cpick').forEach(el => el.remove());
+  }
+}
+
+function attachPalette(row) {
+  const wrap = document.createElement('div');
+  wrap.className = 'cpick';
+  wrap.style.display = 'flex';
+  const lbl = document.createElement('span');
+  lbl.className = 'cpick-label';
+  lbl.textContent = '색상 :';
+  wrap.appendChild(lbl);
+  const cur = row.dataset.c || 'c-neutral';
+  PALETTE.forEach(p => {
+    const dot = document.createElement('div');
+    dot.className = 'cdot' + (p.cls === cur ? ' sel' : '');
+    dot.style.background = p.hex;
+    dot.title = p.lbl;
+    dot.onclick = () => setColor(row, p.cls, dot);
+    wrap.appendChild(dot);
+  });
+  row.appendChild(wrap);
+}
+
+function setColor(row, cls, dot) {
+  const bar = row.querySelector('.bar');
+  PALETTE.forEach(p => bar.classList.remove(p.cls));
+  bar.classList.add(cls);
+  row.dataset.c = cls;
+  row.querySelectorAll('.cdot').forEach(d => d.classList.remove('sel'));
+  dot.classList.add('sel');
+  recalc();
+}
+
+// ── 행 추가/삭제 ──
+function delRow(btn) {
+  const row = btn.closest('.srow');
+  const sched = row.closest('.schedule');
+  if (sched.querySelectorAll('.srow').length <= 1) return;
+  row.remove();
+  recalc();
+}
+
+function addAfter(btn) {
+  const row = btn.closest('.srow');
+  const newRow = makeRow();
+  row.after(newRow);
+  if (editOn) attachPalette(newRow);
+  recalc();
+}
+
+function addToSched(id) {
+  const sched = document.getElementById(id);
+  const newRow = makeRow();
+  sched.appendChild(newRow);
+  if (editOn) attachPalette(newRow);
+  recalc();
+}
+
+function makeRow() {
+  const row = document.createElement('div');
+  row.className = 'srow';
+  row.dataset.c = 'c-neutral';
+  const ce = editOn ? 'true' : 'false';
+  row.innerHTML =
+    '<div class="tcol"><span contenteditable="' + ce + '">00:00</span></div>' +
+    '<div class="bcol"><div class="bar c-neutral">' +
+      '<span class="bar-main" contenteditable="' + ce + '">새 항목</span>' +
+      '<span class="bar-dur" contenteditable="' + ce + '"></span>' +
+    '</div></div>' +
+    '<div class="row-btns" style="display:' + (editOn ? 'flex' : 'none') + '">' +
+      '<button class="rbtn" onclick="delRow(this)">×</button>' +
+      '<button class="rbtn" onclick="addAfter(this)">+</button>' +
+    '</div>';
+  return row;
+}
+
+// ── 자동 계산 ──
+function t2m(s) {
+  s = (s || '').trim().replace(/[^\d:]/g, '');
+  const p = s.split(':');
+  if (p.length < 2) return NaN;
+  const h = parseInt(p[0], 10), m = parseInt(p[1], 10);
+  if (isNaN(h) || isNaN(m)) return NaN;
+  return h * 60 + m;
+}
+
+function m2s(min) {
+  if (!min || min <= 0) return '0h';
+  const h = Math.floor(min / 60), m = min % 60;
+  return m === 0 ? h + 'h' : h + 'h ' + m + 'm';
+}
+
+function calcStudy(schedId) {
+  const sched = document.getElementById(schedId);
+  if (!sched) return 0;
+  const rows = Array.from(sched.querySelectorAll('.srow'));
+  let total = 0;
+  for (let i = 0; i < rows.length - 1; i++) {
+    const t0 = t2m(rows[i].querySelector('.tcol span').textContent);
+    let t1 = t2m(rows[i + 1].querySelector('.tcol span').textContent);
+    if (isNaN(t0) || isNaN(t1)) continue;
+    if (t1 === 0) t1 = 1440;
+    const diff = t1 - t0;
+    if (diff <= 0) continue;
+    const bar = rows[i].querySelector('.bar');
+    if (bar && STUDY_CLS.some(c => bar.classList.contains(c))) total += diff;
+  }
+  return total;
+}
+
+function recalc() {
+  const tt = calcStudy('s-tue_thu');
+  const mw = calcStudy('s-mon_wed');
+  const fs = calcStudy('s-fri_sat');
+
+  document.getElementById('sv-tue_thu').textContent = m2s(tt);
+  document.getElementById('sv-mon_wed').textContent = m2s(mw);
+  document.getElementById('sv-fri_sat').textContent = m2s(fs);
+  document.getElementById('sv-fri_sat-total').textContent = m2s(fs * 2);
+
+  const weekday = tt * 2 + mw * 2;
+  const free    = fs * 2;
+  const grand   = weekday + free;
+
+  const activeId = (document.querySelector('.panel.active') || {}).id || 'tue_thu';
+  const activeStudy = activeId === 'tue_thu' ? tt : activeId === 'mon_wed' ? mw : fs;
+
+  document.getElementById('val-day').textContent = m2s(activeStudy);
+
+  if (activeId === 'fri_sat') {
+    document.getElementById('lbl-week').textContent = '자유일 합계';
+    document.getElementById('val-week').textContent = m2s(free);
+    document.getElementById('sub-week').textContent = '금·토 × 2일';
+  } else {
+    document.getElementById('lbl-week').textContent = '평일 합계';
+    document.getElementById('val-week').textContent = m2s(weekday);
+    document.getElementById('sub-week').textContent = '화목×2 + 월수×2';
+  }
+
+  document.getElementById('val-total').textContent = m2s(grand);
+  document.getElementById('sub-total').textContent = '평일 ' + m2s(weekday) + ' + 자유 ' + m2s(free);
+}
+
+// 시간/텍스트 수정 시 재계산
+document.addEventListener('input', e => {
+  if (e.target.closest('.tcol') || e.target.closest('.bcol')) recalc();
+});
+
+// 초기 계산
+recalc();
+</script>
+</body>
+</html>
